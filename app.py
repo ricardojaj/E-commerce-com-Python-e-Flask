@@ -1,5 +1,5 @@
 # importacao
-from flask import Flask, request
+from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 
 # variavel para receber instancia da classe flask
@@ -18,16 +18,32 @@ class Produto(db.Model):
     price = db.Column(db.Float, nullable=False)
     description = db.Column(db.Text, nullable=True)
 
-
+# add
 @app.route('/api/products/add', methods=["POST"])
 def add_product():
     #variavel para receber dados da minha requisicao
     data = request.json
-    #criar produto e salvar no db
-    product = Produto(name=data["name"], price=data["price"], description=data.get("description", ""))
-    db.session.add(product)
-    db.session.commit()
-    return "Product successfully registered."
+    if 'name' in data and 'price' in data:
+        #criar produto e salvar no db
+        product = Produto(name=data["name"], price=data["price"], description=data.get("description", ""))
+        db.session.add(product)
+        db.session.commit()
+        return "Product successfully registered."
+    return jsonify({"message": "Invalid product data"}), 400
+
+
+# delete
+@app.route('/api/products/delete/<int:product_id>', methods=["DELETE"])
+def delete_product(product_id):
+    #recuperar product na base
+    # condicao para verificar se o produto realmente existe
+    product = Produto.query.get(product_id)
+    if product:
+        db.session.delete(product)
+        db.session.commit()
+        return jsonify ({"message": "Product deleted successfully."})
+    return jsonify({"message": "Product not found"}), 404
+
 
 # Definindo uma rota raiz (page inicial) e a funcao que sera executada ao ser requisitada pelo user
 @app.route('/teste')
