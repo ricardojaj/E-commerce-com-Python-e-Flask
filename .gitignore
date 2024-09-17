@@ -1,0 +1,6 @@
+# Created by pytest automatically.
+*
+# Ignorar arquivos de banco de dados SQLite
+*.db
+/instance/*.db
+.venv/
