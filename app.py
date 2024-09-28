@@ -2,14 +2,18 @@
 from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
-from flask_login import UserMixin
+from flask_login import UserMixin, login_user, LoginManager, login_required, logout_user
 
 # variavel para receber instancia da classe flask
 app = Flask(__name__)
+app.config['SECRET_KEY'] = "8SeYX1u8oU"
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///ecommerce.db'
 
+login_manager = LoginManager()
 # conexao
 db = SQLAlchemy(app)
+login_manager.init_app(app)
+login_manager.login_view = 'login'
 
 #config para permitir que outros sistemas acesse o meu sistema
 #com essa config consegui executar os endpoints no Swagger Editor
@@ -31,9 +35,14 @@ class User(db.Model, UserMixin):
     username = db.Column(db.String(80), nullable=False, unique=True)
     password = db.Column(db.String(80), nullable=False)
 
+#Autenticacao
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
 
 # add
 @app.route('/api/products/add', methods=["POST"])
+@login_required 
 def add_product():
     #variavel para receber dados da minha requisicao
     data = request.json
@@ -48,6 +57,7 @@ def add_product():
 
 # delete
 @app.route('/api/products/delete/<int:product_id>', methods=["DELETE"])
+@login_required 
 def delete_product(product_id):
     #recuperar product na base
     # condicao para verificar se o produto realmente existe
@@ -92,6 +102,7 @@ def get_all_products():
     
 #update product
 @app.route('/api/products/update/<int:product_id>', methods=["PUT"])
+@login_required 
 def update_product(product_id):
     product = Product.query.get(product_id)
     if not product:
@@ -123,9 +134,17 @@ def login():
 
     if user:
         if user and data.get("password") == user.password:
+            login_user(user)
             return jsonify({"message": "Logged in successfully"})
     
     return jsonify({"message": "Unauthorized. Invalid credentials"}), 401
+
+#rota logout
+@app.route('/logout', methods=['POST'])
+@login_required
+def logout():
+    logout_user()
+    return jsonify({"message": "Logout in successfully"})
     
 
 # Definindo uma rota raiz (page inicial) e a funcao que sera executada ao ser requisitada pelo user
