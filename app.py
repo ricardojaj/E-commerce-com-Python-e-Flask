@@ -2,7 +2,7 @@
 from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
-from flask_login import UserMixin, login_user, LoginManager, login_required, logout_user
+from flask_login import UserMixin, login_user, LoginManager, login_required, logout_user, current_user
 
 # variavel para receber instancia da classe flask
 app = Flask(__name__)
@@ -29,16 +29,43 @@ class Product(db.Model):
     price = db.Column(db.Float, nullable=False)
     description = db.Column(db.Text, nullable=True)
 
+class CartItem(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=False)
+
 #utilziando Usermixin que ja vai herdar metodos existentes
 class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), nullable=False, unique=True)
     password = db.Column(db.String(80), nullable=False)
+    cart = db.relationship('CartItem', backref='user', lazy=True)
 
 #Autenticacao
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
+
+# rota login
+@app.route('/login', methods=["POST"])
+def login():
+    data = request.json
+    
+    user = User.query.filter_by(username=data.get("username")).first()
+
+    if user:
+        if user and data.get("password") == user.password:
+            login_user(user)
+            return jsonify({"message": "Logged in successfully"})
+    
+    return jsonify({"message": "Unauthorized. Invalid credentials"}), 401
+
+#rota logout
+@app.route('/logout', methods=['POST'])
+@login_required
+def logout():
+    logout_user()
+    return jsonify({"message": "Logout in successfully"})
 
 # add
 @app.route('/api/products/add', methods=["POST"])
@@ -125,32 +152,20 @@ def update_product(product_id):
     return jsonify({'message': 'Product updated susuccessfully'}), 200
 
 
-# rota login
-@app.route('/login', methods=["POST"])
-def login():
-    data = request.json
-    
-    user = User.query.filter_by(username=data.get("username")).first()
-
-    if user:
-        if user and data.get("password") == user.password:
-            login_user(user)
-            return jsonify({"message": "Logged in successfully"})
-    
-    return jsonify({"message": "Unauthorized. Invalid credentials"}), 401
-
-#rota logout
-@app.route('/logout', methods=['POST'])
+# Checkout
+@app.route('/api/cart/add/<int:product_id>', methods=['POST'])
 @login_required
-def logout():
-    logout_user()
-    return jsonify({"message": "Logout in successfully"})
-    
+def add_to_cart(product_id):
+    #info necessaria (user e product)
+    user = User.query.get(int(current_user.id))
+    product = Product.query.get(product_id)
 
-# Definindo uma rota raiz (page inicial) e a funcao que sera executada ao ser requisitada pelo user
-@app.route('/teste')
-def hello_world():
-    return 'Hello World'
+
+    if user and product:
+        return jsonify({'message': 'Item added to the cart successfully'}), 200
+    return jsonify({'message': 'Failed to add item to the cart'}), 400
+
+
 
 # Disponibilizando api para ser utilizada no modo debug
 if __name__ == "__main__":
